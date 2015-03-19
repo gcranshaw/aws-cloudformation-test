@@ -1,0 +1,110 @@
+
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "Build VPC and EC2 Instance as Web Server",
+
+
+  "Resources" : {
+
+    "VPC" : {
+      "Type" : "AWS::EC2::VPC",
+      "Properties" : {
+        "EnableDnsSupport" : "true",
+        "EnableDnsHostnames" : "true",
+        "CidrBlock" : "10.100.0.0/16",
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Public" }
+        ]
+      }
+    },
+
+    "PublicSubnet" : {
+      "Type" : "AWS::EC2::Subnet",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" },
+        "CidrBlock" : "10.100.0.0/24",
+        "Tags" : [
+          { "Key" : "Application", "Value" : { "Ref" : "AWS::StackName" } },
+          { "Key" : "Network", "Value" : "Public" }
+        ]
+      }
+    },
+
+    "InternetGateway" : {
+      "Type" : "AWS::EC2::InternetGateway"   
+       },
+
+    "GatewayToInternet" : {
+       "Type" : "AWS::EC2::VPCGatewayAttachment",
+       "Properties" : {
+         "VpcId" : { "Ref" : "VPC" },
+         "InternetGatewayId" : { "Ref" : "InternetGateway" }
+       }
+    },
+
+    "PublicRouteTable" : {
+      "Type" : "AWS::EC2::RouteTable",
+      "Properties" : {
+        "VpcId" : { "Ref" : "VPC" }
+      }
+    },
+
+    "PublicRoute" : {
+      "Type" : "AWS::EC2::Route",
+      "DependsOn" : "GatewayToInternet",
+      "Properties" : {
+        "RouteTableId" : { "Ref" : "PublicRouteTable" },
+        "DestinationCidrBlock" : "0.0.0.0/0",
+        "GatewayId" : { "Ref" : "InternetGateway" }
+      }
+    },
+
+    "PublicSubnetRouteTableAssociation" : {
+      "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties" : {
+        "SubnetId" : { "Ref" : "PublicSubnet" },
+        "RouteTableId" : { "Ref" : "PublicRouteTable" }
+      }
+    },
+
+    "WebServerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP and SSH access on the configured ports",
+        "VpcId" : { "Ref" : "VPC" },
+        "SecurityGroupIngress" : [
+          {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+          {"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"}
+        ]
+      }
+    },
+
+    "PublicInstance" : {
+      "Type" : "AWS::EC2::Instance",
+      "DependsOn" : "GatewayToInternet",
+      "Properties" : {
+        "InstanceType" : "t2.micro",
+        "ImageId"  : "ami-9a562df2",
+        "UserData" : "IyEvYmluL2Jhc2gKIyBUaGlzIHNjcmlwdCB1cGRhdGVzIHRoZSBpbnN0YW5jZSwgaW5zdGFsbHMgQXBhY2hlIGFuZCBwdWxscyBkb3duIGFuIEhUTUwgZmlsZSBmcm9tIEdJVEhVQgpzdWRvIGFwdC1nZXQgdXBkYXRlICYmIHN1ZG8gYXB0LWdldCB1cGdyYWRlIC15CnN1ZG8gYXB0LWdldCBpbnN0YWxsIGFwYWNoZTIgZ2l0IC15CmNkIC9yb290CmdpdCBjbG9uZSBodHRwczovL2dpdGh1Yi5jb20vZ2NyYW5zaGF3L2F3cy1jbG91ZGZvcm1hdGlvbi10ZXN0CmNwIC1mIGF3cy1jbG91ZGZvcm1hdGlvbi10ZXN0L2luZGV4Lmh0bWwgL3Zhci93d3cvaHRtbC8uCmV4aXQK",
+        "SecurityGroupIds" : [
+          { "Ref" : "WebServerSecurityGroup" }
+        ],
+        "SubnetId" : { "Ref" : "PublicSubnet" }
+      }
+      },
+
+    "IPAddress" : {
+      "Type" : "AWS::EC2::EIP"
+    },
+
+    "IPAssoc" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "PublicInstance" },
+        "EIP" : { "Ref" : "IPAddress" }
+      }
+    }
+}
+}
